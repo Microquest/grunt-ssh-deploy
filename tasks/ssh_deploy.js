@@ -41,7 +41,7 @@ module.exports = function(grunt) {
     grunt.registerTask('ssh_deploy', 'Begin Deployment', function() {
         var done = this.async();
         var Connection = require('ssh2');
-        var client = require('scp2');
+        var Client = require('node-scp');
         var moment = require('moment');
         var timestamp = moment().format('YYYYMMDDHHmmssSSS');
         var async = require('async');
@@ -70,11 +70,8 @@ module.exports = function(grunt) {
         }
 
         var releasePath = path.posix.join(options.deploy_path, options.release_root, options.release_subdir, releaseTag);
-
-        // scp defaults
-        client.defaults(getScpOptions(options));
-
         var c = new Connection();
+
         c.on('connect', function() {
             grunt.log.subhead('Connecting :: ' + options.host);
         });
@@ -190,18 +187,21 @@ module.exports = function(grunt) {
             var scpBuild = function(callback) {
                 var build = (options.zip_deploy) ? 'deploy.tgz' : options.local_path;
                 grunt.log.subhead('--------------- UPLOADING NEW BUILD');
-                grunt.log.debug('SCP FROM LOCAL: ' + build
-                    + '\n TO REMOTE: ' + releasePath);
-                client.scp(build, {
-                    path: releasePath
-                }, function (err) {
-                    if (err) {
-                        grunt.log.errorlns(err);
-                    } else {
-                        grunt.log.subhead('--- DONE UPLOADING');
-                        callback();
-                    }
-                });
+                grunt.log.debug('SCP FROM LOCAL: ' + build + '\n TO REMOTE: ' + releasePath);
+
+                Client(getScpOptions(options)).then(client => {
+                    client.uploadFile(build, releasePath)
+                        .then(response => {
+                            client.close(); // remember to close connection after you finish
+                            grunt.log.subhead('--- DONE UPLOADING');
+                            callback();
+                        })
+                        .catch(error => {
+                            grunt.log.errorlns(error);
+                        });
+                }).catch(e => {
+                        grunt.log.errorlns(e);
+                    });
             };
 
             var unzipOnRemote = function(callback) {
@@ -267,11 +267,6 @@ module.exports = function(grunt) {
             // closing connection to remote server
             var closeConnection = function(callback) {
                 connection.end();
-
-                client.close();
-                client.__sftp = null;
-                client.__ssh = null;
-
                 callback();
             };
 
