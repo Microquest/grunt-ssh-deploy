@@ -68,7 +68,7 @@ module.exports = function(grunt) {
         if (releaseTag == '') {
             releaseTag = defaults.tag;
         }
-
+        let scpOptions = getScpOptions(options);
         var releasePath = path.posix.join(options.deploy_path, options.release_root, options.release_subdir, releaseTag);
         var c = new Connection();
 
@@ -188,8 +188,9 @@ module.exports = function(grunt) {
                 var build = (options.zip_deploy) ? 'deploy.tgz' : options.local_path;
                 grunt.log.subhead('--------------- UPLOADING NEW BUILD');
                 grunt.log.debug('SCP FROM LOCAL: ' + build + '\n TO REMOTE: ' + releasePath);
-
-                Client(getScpOptions(options)).then(client => {
+                grunt.log.debug('scpOptions: ', scpOptions);
+                
+                Client(scpOptions).then(client => {
                     client.uploadFile(build, releasePath)
                         .then(response => {
                             client.close(); // remember to close connection after you finish
