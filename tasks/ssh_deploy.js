@@ -13,9 +13,8 @@ var path = require('path');
 var getScpOptions = function(options) {
     var scpOptions = {
         port: options.port,
-        host: options.host,
-        username: options.username,
-        readyTimeout: options.readyTimeout
+        hostname: options.host,
+        user: options.username,
     };
 
     if (options.privateKey) {
@@ -25,7 +24,7 @@ var getScpOptions = function(options) {
         }
     }
     else if (options.password) {
-        scpOptions.password = options.password;
+        scpOptions.pass = options.password;
     }
     else if (options.agent) {
         scpOptions.agent = options.agent;
@@ -40,14 +39,14 @@ module.exports = function(grunt) {
 
     grunt.registerTask('ssh_deploy', 'Begin Deployment', function() {
         var done = this.async();
-        var Connection = require('ssh2');
-        var Client = require('node-scp');
+        var Connection = require('ssh2').Client;
+        var SCP = require('node-sshclient').SCP;
         var moment = require('moment');
         var timestamp = moment().format('YYYYMMDDHHmmssSSS');
         var async = require('async');
         var childProcessExec = require('child_process').exec;
         var extend = require('extend');
-        
+
         var defaults = {
             current_symlink: 'current',
             port: 22,
@@ -68,7 +67,7 @@ module.exports = function(grunt) {
         if (releaseTag == '') {
             releaseTag = defaults.tag;
         }
-        let scpOptions = getScpOptions(options);
+
         var releasePath = path.posix.join(options.deploy_path, options.release_root, options.release_subdir, releaseTag);
         var c = new Connection();
 
@@ -94,10 +93,10 @@ module.exports = function(grunt) {
 
         var execCommands = function(options, connection){
             var execLocal = function(cmd, next) {
-            	var execOptions = {
-            		maxBuffer: options.max_buffer	
-            	};
-            	
+                var execOptions = {
+                    maxBuffer: options.max_buffer
+                };
+
                 childProcessExec(cmd, execOptions, function(err, stdout, stderr){
                     grunt.log.debug(cmd);
                     grunt.log.debug('stdout: ' + stdout);
@@ -135,31 +134,31 @@ module.exports = function(grunt) {
             };
 
             var zipForDeploy = function(callback) {
-              if (!options.zip_deploy) return callback();
+                if (!options.zip_deploy) return callback();
 
-              childProcessExec('tar --version', function (error, stdout, stderr) {
-                if (!error) {
-                  var isGnuTar = stdout.match(/GNU tar/);
-                  var command = "tar -czvf ./deploy.tgz";
-                  
-                  if(options.exclude.length) {
-                    options.exclude.forEach(function(exclusion) {
-                      command += ' --exclude=' + exclusion;
-                    });
-                  }
+                childProcessExec('tar --version', function (error, stdout, stderr) {
+                    if (!error) {
+                        var isGnuTar = stdout.match(/GNU tar/);
+                        var command = "tar -czvf ./deploy.tgz";
 
-                  if (isGnuTar) {
-                    command += " --exclude=deploy.tgz --ignore-failed-read --directory=" + options.local_path + " .";
-                  } else {
-                    command += " --directory=" + options.local_path + " .";
-                  }
+                        if(options.exclude.length) {
+                            options.exclude.forEach(function(exclusion) {
+                                command += ' --exclude=' + exclusion;
+                            });
+                        }
 
-                  grunt.log.subhead('--------------- ZIPPING FOLDER');
-                  grunt.log.subhead('--- ' + command);
+                        if (isGnuTar) {
+                            command += " --exclude=deploy.tgz --ignore-failed-read --directory=" + options.local_path + " .";
+                        } else {
+                            command += " --directory=" + options.local_path + " .";
+                        }
 
-                  execLocal(command, callback);
-                }
-              });
+                        grunt.log.subhead('--------------- ZIPPING FOLDER');
+                        grunt.log.subhead('--- ' + command);
+
+                        execLocal(command, callback);
+                    }
+                });
             };
 
             var onBeforeDeploy = function(callback){
@@ -189,19 +188,17 @@ module.exports = function(grunt) {
                 grunt.log.subhead('--------------- UPLOADING NEW BUILD');
                 grunt.log.debug('SCP FROM LOCAL: ' + build + '\n TO REMOTE: ' + releasePath);
 
-                Client(scpOptions).then(client => {
-                    client.uploadFile(build, releasePath)
-                        .then(response => {
-                            client.close(); // remember to close connection after you finish
-                            grunt.log.subhead('--- DONE UPLOADING');
-                            callback();
-                        })
-                        .catch(error => {
-                            grunt.log.errorlns(error);
-                        });
-                }).catch(e => {
-                        grunt.log.errorlns(e);
-                    });
+                var scp = new SCP(getScpOptions(options));
+
+                scp.upload(build, releasePath, function(procResult) {
+                    if (procResult.exitCode == 0) {
+                        grunt.log.subhead('--- DONE UPLOADING');
+                        callback();
+                    } else {
+                        grunt.log.subhead('--- ERROR UPLOADING');
+                        callback('Error uploading:' + procResult.exitCode);
+                    }
+                });
             };
 
             var unzipOnRemote = function(callback) {
@@ -284,6 +281,8 @@ module.exports = function(grunt) {
             ], function () {
                 done();
             });
+
         };
+
     });
 };
