@@ -189,7 +189,7 @@ module.exports = function(grunt) {
                 grunt.log.subhead('--------------- UPLOADING NEW BUILD');
                 grunt.log.debug('SCP FROM LOCAL: ' + build + '\n TO REMOTE: ' + releasePath);
                 grunt.log.debug('scpOptions: ', scpOptions);
-                
+
                 Client(scpOptions).then(client => {
                     client.uploadFile(build, releasePath)
                         .then(response => {
