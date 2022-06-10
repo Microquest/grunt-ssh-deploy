@@ -188,7 +188,6 @@ module.exports = function(grunt) {
                 var build = (options.zip_deploy) ? 'deploy.tgz' : options.local_path;
                 grunt.log.subhead('--------------- UPLOADING NEW BUILD');
                 grunt.log.debug('SCP FROM LOCAL: ' + build + '\n TO REMOTE: ' + releasePath);
-                grunt.log.debug('scpOptions: ', scpOptions);
 
                 Client(scpOptions).then(client => {
                     client.uploadFile(build, releasePath)

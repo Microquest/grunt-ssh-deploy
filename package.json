@@ -1,7 +1,7 @@
 {
   "name": "grunt-ssh-deploy",
   "description": "Grunt SSH deployment",
-  "version": "0.4.1",
+  "version": "0.6.0",
   "homepage": "https://github.com/Microquest/grunt-ssh-deploy",
   "author": {
     "name": "Dan Black",
@@ -21,7 +21,7 @@
     }
   ],
   "engines": {
-    "node": ">= 0.12.0"
+    "node": ">= 14.0.0"
   },
   "scripts": {
     "test": "grunt test"
